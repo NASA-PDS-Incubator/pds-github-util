@@ -5,7 +5,16 @@ import github3
 from packaging import version
 from datetime import datetime
 logging.basicConfig(level=logging.INFO)
+
+import http.client
+http.client.HTTPConnection.debuglevel = 1
+
 logger = logging.getLogger(__name__)
+
+
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 VOID_URL = 'https://en.wikipedia.org/wiki/Void_(astronomy)'
 SHORT_DESCRIPTION_LEN = 50
@@ -69,6 +78,18 @@ class CattleHead():
 
         return latest_tag if latest_tag else None
 
+    @staticmethod
+    def _reachable(url):
+        logger.info(f'try url {url}')
+        time_out = 5;
+        try:
+            response = requests.head(url, timeout=time_out)
+            return response.status_code != 404
+        except requests.exceptions as e:
+            logger.info(f'url {url} not reachable in {time_out}s')
+            return False
+
+
     def _get_cell(self, function):
         link_func = eval(f'self._get_{function}_link()')
         return f'[![{function}]({self._icon_dict[function]})]({link_func} "{function}")' if link_func else ' '
@@ -79,11 +100,11 @@ class CattleHead():
     def _get_manual_link(self):
         if self._version_name:
             url = f'https://{self._org}.github.io/{self._repo_name}/{self._version_name}'
-            if requests.get(url).status_code != 404:
+            if self._reachable(url):
                 return url
             elif self._version_name[0] == 'v':
                 url = f'https://{self._org}.github.io/{self._repo_name}/{self._version_name[1:]}'
-                if requests.get(url).status_code != 404:
+                if self._reachable(url):
                     return url
 
         return f'https://{self._org}.github.io/{self._repo_name}'
@@ -100,8 +121,8 @@ class CattleHead():
 
     def _get_requirements_link(self):
         url = f'https://github.com/{self._org}/{self._repo_name}/blob/master/docs/requirements/{self._version_name}/REQUIREMENTS.md'
-        logger.info(f'try url {url} for requirements')
-        if self._version_name and requests.get(url, timeout=5).status_code != 404:
+
+        if self._version_name and self._reachable(url):
             return url
         else:
             return None

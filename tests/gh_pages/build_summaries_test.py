@@ -5,8 +5,11 @@ from pds_github_util.gh_pages.build_summaries import build_summaries
 TOKEN = os.environ.get('GITHUB_TOKEN')
 
 class MyTestCase(unittest.TestCase):
-    def test_something(self):
-        build_summaries(TOKEN)
+    #def test_default_summaries(self):
+    #    build_summaries(TOKEN)
+
+    def test_rst_summaries(self):
+        build_summaries(TOKEN, path='tmp', format='rst')
 
 
 if __name__ == '__main__':

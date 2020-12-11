@@ -1,6 +1,5 @@
 import os
 import logging
-from mdutils import MdUtils
 from pds_github_util.tags.tags import Tags
 from pds_github_util.corral.herd import Herd
 
@@ -9,7 +8,51 @@ logger = logging.getLogger(__name__)
 
 COLUMNS = ['manual', 'changelog', 'requirements', 'download', 'license', 'feedback']
 
-def write_build_summary(gitmodules=None, root_dir='.', output_file_name=None, token=None, dev=False, version=None):
+
+def get_table_columns():
+    column_headers = []
+    for column in COLUMNS:
+        column_headers.append(f'![{column}](https://nasa-pds.github.io/pdsen-corral/images/{column}_text.png)')
+
+    return ["tool", "version", "last updated", "description", *column_headers]
+
+def write_md_file(herd, output_file_name, version):
+    from mdutils import MdUtils
+
+    software_summary_md = MdUtils(file_name=output_file_name, title=f'Software Summary (build {version})')
+
+    table = get_table_columns()
+    n_columns = len(table)
+    for k, ch in herd.get_cattle_heads().items():
+        table.extend(ch.get_table_row())
+    software_summary_md.new_table(columns=n_columns,
+                                  rows=herd.number_of_heads() + 1,
+                                  text=table,
+                                  text_align='center')
+
+    software_summary_md.create_md_file()
+
+
+def write_rst_file(herd, output_file_name, version):
+    from rstcloth import RstCloth
+
+    d = RstCloth()
+    d.title(f'Software Summary (build {version})')
+
+    data = []
+    for k, ch in herd.get_cattle_heads().items():
+        data.extend(ch.get_table_row())
+
+    d.table(
+        get_table_columns(),
+        data=data
+    )
+
+    d.write(f'{output_file_name}.rst')
+
+
+
+def write_build_summary(gitmodules=None, root_dir='.', output_file_name=None, token=None, dev=False, version=None, format='md'):
 
     herd = Herd(gitmodules=gitmodules, dev=dev, token=token)
 
@@ -32,21 +75,9 @@ def write_build_summary(gitmodules=None, root_dir='.', output_file_name=None, to
         output_file_name = os.path.join(root_dir, version, 'index')
     os.makedirs(os.path.dirname(output_file_name), exist_ok=True)
 
-    software_summary_md = MdUtils(file_name=output_file_name, title=f'Software Summary (build {version})')
-
-    column_headers = []
-    for column in COLUMNS:
-        column_headers.append(f'![{column}](https://nasa-pds.github.io/pdsen-corral/images/{column}_text.png)')
-
-    table = ["tool", "version", "last updated", "description", *column_headers]
-    n_columns = len(table)
-    for k, ch in herd.get_cattle_heads().items():
-        table.extend(ch.get_table_row())
-    software_summary_md.new_table(columns=n_columns,
-                                  rows=herd.number_of_heads()+1,
-                                  text=table,
-                                  text_align='center')
-
-    software_summary_md.create_md_file()
+    if format == 'md':
+        write_md_file(herd, output_file_name, version)
+    elif format == 'rst':
+        write_rst_file(herd, output_file_name, version)
 
     return herd
